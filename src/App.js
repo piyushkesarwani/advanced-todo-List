@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Button, Form } from "react-bootstrap";
 import "./App.css";
-import { List } from "./List/List";
 import InputGroup from "react-bootstrap/InputGroup";
 import OverlayTrigger from "react-bootstrap/OverlayTrigger";
 import Tooltip from "react-bootstrap/Tooltip";
+import { Table, Tag, Space, Modal, Input } from "antd";
+import { AiFillEdit, AiFillDelete } from "react-icons/ai";
 
 function App() {
   const [list, setList] = useState(
@@ -16,19 +17,130 @@ function App() {
   const [tags, setTags] = useState("");
   const [status, setStatus] = useState("OPEN");
   const [isEditing, setIsEditing] = useState(false);
-  const [editId, setEditId] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [validated, setValidated] = useState(false);
   const [error, setError] = useState("");
+  const [searchedText, setSearchedText] = useState("");
 
-  const [searchQuery, setSearchQuery] = useState("");
+  function getTodaysDate() {
+    const today = new Date();
+    const year = today.getFullYear();
+    let month = today.getMonth() + 1;
+    let day = today.getDate();
 
-  const [sortOrder, setSortOrder] = useState("asc");
+    if (month < 10) {
+      month = "0" + month;
+    }
 
-  const date = new Date();
-  const day = date.getDate(); //8
-  const month = date.getMonth() + 1; //1
-  const year = date.getFullYear(); //2023
-  const todayDate = `${year}-0${month}-0${day}`;
+    if (day < 10) {
+      day = "0" + day;
+    }
+
+    return `${year}-${month}-${day}`;
+  }
+
+  //Column Data from antd
+
+  const column = [
+    {
+      title: "Title",
+      dataIndex: "title",
+      key: "key",
+      sorter: (a, b) => a.title.length - b.title.length,
+      filteredValue: [searchedText],
+      onFilter: (value, record) => {
+        return record.title.toLowerCase().includes(value.toLowerCase()) ||  record.desc.toLowerCase().includes(value.toLowerCase()) || record.dueDate.toLowerCase().includes(value.toLowerCase())
+      },
+    },
+    {
+      title: "Description",
+      dataIndex: "desc",
+      key: "key",
+    },
+    {
+      title: "Due Date",
+      dataIndex: "dueDate",
+      key: "key",
+      // defaultSortOrder: 'descend',
+      // sorter: (a, b) => (a.dueDate.length) - (b.dueDate.length),
+    },
+    {
+      title: "TimeStamp",
+      dataIndex: "timestamp",
+      key: "key",
+      // defaultSortOrder: 'descend',
+      // sorter: (a, b) => (a.timestamp.length) - (b.timestamp.length),
+    },
+    {
+      title: "Tags",
+      dataIndex: "tags",
+      key: "key",
+      render: (_, { tags }) => (
+        <>
+          {[...new Set(tags.split(","))].map((tag) => {
+            let color = tag.length > 5 ? "geekblue" : "green";
+            if (tag === "loser") {
+              color = "volcano";
+            }
+            return (
+              <Tag color={color} key={tag}>
+                {tag.toUpperCase()}
+              </Tag>
+            );
+          })}
+        </>
+      ),
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "key",
+      filters: [
+        {
+          text: "OPEN",
+          value: "OPEN",
+        },
+        {
+          text: "WORKING",
+          value: "WORKING",
+        },
+        {
+          text: "DONE",
+          value: "DONE",
+        },
+        {
+          text: "OVERDUE",
+          value: "OVERDUE",
+        },
+      ],
+      onFilter: (value, record) => {
+        return record.status.indexOf(value) === 0;
+      },
+    },
+    {
+      title: "Operate",
+      key: "action",
+      render: (_, record) => (
+        <Space
+          size="middle"
+          className="d-flex justify-content-around align-items-center"
+        >
+          <AiFillEdit
+            onClick={() => editItem(record)}
+            className="fs-6 text-success"
+          />
+          <AiFillDelete
+            onClick={() => deleteItem(record)}
+            className="fs-6 text-danger"
+          />
+        </Space>
+      ),
+    },
+  ];
+
+  const onChange = (pagination, filters, sorter, extra) => {
+    console.log("params", pagination, filters, sorter, extra);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -36,33 +148,34 @@ function App() {
     if (!title || !desc || !status) {
       //show alert and error if the entry is empty!
       alert("Mandatory fields cannot be empty");
-    } else if (title && tags && dueDate && desc && status && isEditing) {
-      //handle editing of this section
-      setList(
-        list.map((item) => {
-          if (item.id === editId) {
-            return {
-              ...item,
-              title: title,
-              desc: desc,
-              tags: tags,
-              dueDate: dueDate,
-              status: status,
-            };
-          }
-          return item;
-        })
-      );
-      setTitle("");
-      setDesc("");
-      setTags("");
-      setDueDate("");
-      setStatus("OPEN");
-      setEditId(null);
-      setIsEditing(false);
-    } else {
+    }
+    // else if (title && tags && dueDate && desc && status) {
+    //   //handle editing of this section
+    //   setList(
+    //     list.map((item) => {
+    //       if (item.id === editId) {
+    //         return {
+    //           ...item,
+    //           title: title,
+    //           desc: desc,
+    //           tags: tags,
+    //           dueDate: dueDate,
+    //           status: status,
+    //         };
+    //       }
+    //       return item;
+    //     })
+    //   );
+    //   setTitle("");
+    //   setDesc("");
+    //   setTags("");
+    //   setDueDate("");
+    //   setStatus("OPEN");
+    //   setEditId(null);
+    // setIsEditing(false);}
+    else {
       //add the item to the list
-      if (dueDate < todayDate) {
+      if (dueDate < getTodaysDate()) {
         setError(
           "Due Date must be set in the future! Please Provide a valid Due Date to the task."
         );
@@ -74,17 +187,17 @@ function App() {
         desc: desc,
         dueDate: dueDate,
         tags: tags,
+        timestamp: getTodaysDate(),
         status: status,
       };
       setList([...list, newItem]);
       setTitle("");
       setDesc("");
       setDueDate("");
-      setTags("");
+      setTags([]);
       setStatus("OPEN");
       setError("");
       console.log(list);
-      // console.log(Date.now().toString());
     }
 
     const form = e.currentTarget;
@@ -96,44 +209,60 @@ function App() {
     setValidated(true);
   };
 
-  const deleteItem = (id) => {
-    //deleting an existing Item from the list
-    setList(list.filter((item) => item.id !== id));
+  const deleteItem = (record) => {
+    Modal.confirm({
+      title: "Are you sure to delete this Item from the list?",
+      onOk: () => {
+        setList((pre) => {
+          return pre.filter((item) => item.id !== record.id);
+        });
+      },
+    });
   };
 
-  const editItem = (id) => {
-    //handling the editing of item in the list
-    const specificItem = list.find((item) => item.id === id);
+  const editItem = (record) => {
     setIsEditing(true);
-    setEditId(id);
-    setTitle(specificItem.title);
-    setDesc(specificItem.desc);
-    setDueDate(specificItem.dueDate);
-    setTags(specificItem.tags);
-    setStatus(specificItem.status);
+    setEditingItem({ ...record });
   };
+
+  const resetEditing = () => {
+    setIsEditing(false);
+    setEditingItem(null);
+  };
+
+  // const editItem = (id) => {
+  //   //handling the editing of item in the list
+  //   const specificItem = list.find((item) => item.id === id);
+  //   // setIsEditing(true);
+  //   setEditId(id);
+  //   setTitle(specificItem.title);
+  //   setDesc(specificItem.desc);
+  //   setDueDate(specificItem.dueDate);
+  //   setTags(specificItem.tags);
+  //   setStatus(specificItem.status);
+  // };
 
   const clearList = () => {
     setList([]);
   };
 
   //sort list in Ascending/Descending Order ->
-  const sortList = () => {
-    const sortedList = [...list];
-    sortedList.sort((a, b) => {
-      if (sortOrder === "asc") {
-        if (a.title < b.title) return -1;
-        if (a.title > b.title) return 1;
-        return 0;
-      } else {
-        //sort the list in descending order
-        if (a.title < b.title) return 1;
-        if (a.title > b.title) return -1;
-        return 0;
-      }
-    });
-    setList(sortedList);
-  };
+  // const sortList = () => {
+  //   const sortedList = [...list];
+  //   sortedList.sort((a, b) => {
+  //     if (sortOrder === "asc") {
+  //       if (a.title < b.title) return -1;
+  //       if (a.title > b.title) return 1;
+  //       return 0;
+  //     } else {
+  //       //sort the list in descending order
+  //       if (a.title < b.title) return 1;
+  //       if (a.title > b.title) return -1;
+  //       return 0;
+  //     }
+  //   });
+  //   setList(sortedList);
+  // };
 
   useEffect(() => {
     localStorage.setItem("todoList", JSON.stringify(list));
@@ -280,7 +409,7 @@ function App() {
                   Please select a valid Status.
                 </Form.Control.Feedback>
               </Form.Group>
-              {isEditing ? (
+              {/* {isEditing ? (
                 <Button type="submit" className="formBtn">
                   Edit
                 </Button>
@@ -288,28 +417,52 @@ function App() {
                 <Button type="submit" className="formBtn">
                   Submit
                 </Button>
-              )}
+              )} */}
+              <Button type="submit" className="formBtn">
+                Submit
+              </Button>
             </Form>
           </div>
           {list.length > 0 && (
             <div className="border p-2 mt-3 tablelistContainer">
               <div className="d-flex flex-row align-items-center mb-3">
                 <div className="fs-3 text-dark">Your List</div>
-                <div className="d-flex align-items-center">
-                  <input
+                {/* <div className="d-flex align-items-center">
+                  <Input
                     type="text"
                     placeholder="Enter title to search"
                     className="inputSearch me-4"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (e.target.value === "") {
+                        setList(list);
+                      }
+                    }}
                   />
-                </div>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    // onClick={globalSearch}
+                  >
+                    Search
+                  </Button>
+                </div> */}
+                <Input
+                  type="text"
+                  placeholder="Enter title to search"
+                  className="inputSearch me-4"
+                  onSearch={(value) => {
+                    setSearchedText(value);
+                  }}
+                  onChange={(e) => setSearchedText(e.target.value)}
+                />
                 <div className="ms-auto">
                   <label className="fs-5">Total List Items </label>
                   <strong className="fs-5">({list.length})</strong>
                 </div>
               </div>
-              <List
+              {/* <List
                 list={list}
                 deleteItem={deleteItem}
                 searchQuery={searchQuery}
@@ -318,7 +471,75 @@ function App() {
                 sortList={sortList}
                 setSortOrder={setSortOrder}
                 setList={setList}
+              /> */}
+              <Table
+                dataSource={list}
+                columns={column}
+                onChange={onChange}
+                pagination={{ pageSize: 5 }}
               />
+              <Button onClick={() => clearList()} variant="danger">
+                Clear List
+              </Button>
+              <Modal
+                title="Edit Item in the List"
+                open={isEditing}
+                okText="Save"
+                onCancel={() => resetEditing()}
+                onOk={() => {
+                  setList((pre) => {
+                    return pre.map((item) => {
+                      if (item.id === editingItem.id) {
+                        return editingItem;
+                      } else {
+                        return item;
+                      }
+                    });
+                  });
+                  resetEditing();
+                }}
+              >
+                <Input
+                  value={editingItem?.title}
+                  onChange={(e) =>
+                    setEditingItem((pre) => {
+                      return { ...pre, title: e.target.value };
+                    })
+                  }
+                />
+                <Input
+                  value={editingItem?.desc}
+                  onChange={(e) =>
+                    setEditingItem((pre) => {
+                      return { ...pre, desc: e.target.value };
+                    })
+                  }
+                />
+                <Input
+                  value={editingItem?.dueDate}
+                  onChange={(e) =>
+                    setEditingItem((pre) => {
+                      return { ...pre, dueDate: e.target.value };
+                    })
+                  }
+                />
+                <Input
+                  value={editingItem?.tags}
+                  onChange={(e) =>
+                    setEditingItem((pre) => {
+                      return { ...pre, tags: e.target.value };
+                    })
+                  }
+                />
+                <Input
+                  value={editingItem?.status}
+                  onChange={(e) =>
+                    setEditingItem((pre) => {
+                      return { ...pre, status: e.target.value };
+                    })
+                  }
+                />
+              </Modal>
             </div>
           )}
         </div>
